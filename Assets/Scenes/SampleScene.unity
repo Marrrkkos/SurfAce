@@ -332,9 +332,9 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: '::'
   target: {fileID: 1071279283}
-  fixedHeight: 10
+  fixedHeight: 3
   distance: 5
-  followSpeed: 5
+  followSpeed: 15
   tiltAngle: 20
 --- !u!1 &339398755
 GameObject:
@@ -771,6 +771,7 @@ MonoBehaviour:
   speedMultiplier: 1
   startSpeed: 10
   startSpeedDuration: 20
+  waterForce: 10
 --- !u!54 &1071279285
 Rigidbody:
   m_ObjectHideFlags: 0

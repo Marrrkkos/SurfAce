@@ -21,12 +21,15 @@ public class NewSurfBoardController : MonoBehaviour
     public float speedMultiplier = 1f;
     public float startSpeed = 10f;
     public float startSpeedDuration = 5f;
-
+    public float waterForce = 10f;
+    public float gravityForce = 1f;
     private Vector3 currentRotationInput;
     void Start()
     {
         // WICHTIG: Wir verbieten der Physik, das Board zu drehen!
         rigidBody.freezeRotation = true;
+
+        CalculateStartVelocity();
     }
     void Update() {
         HandleInput();
@@ -44,7 +47,6 @@ public class NewSurfBoardController : MonoBehaviour
         Vector3 waterSlope = GetNormalAtPosition(transform.position);
         CalculateWaterVelocity(waterSlope);
 
-        CalculateStartVelocity();
 
 
         CalculateHeight();
@@ -66,30 +68,31 @@ public class NewSurfBoardController : MonoBehaviour
     }
 
     void CalculateStartVelocity() {
-        rigidBody.linearVelocity = Vector3.Lerp(startSpeed * transform.forward, Vector3.zero, startSpeedDuration * Time.fixedDeltaTime);
+        rigidBody.AddForce(transform.forward * startSpeed, ForceMode.Acceleration);
     }
     void CalculateHeight()
     {
+        
         float waveHeight = RootWaveManager.instance.GetWaveHeight(transform.position);
         float currentHeight = transform.position.y;
 
-        float targetHeight = waveHeight + hoverHeight;
+        float targetHeight = waveHeight;
 
         float diff = targetHeight - currentHeight;
-
         float velocityY = rigidBody.linearVelocity.y;
         float force = (diff * hoverForce) - (velocityY * hoverDamper);
 
         rigidBody.AddForce(Vector3.up * force, ForceMode.Acceleration);
+
     }
 
     void CalculateRotation()
     {
-        Vector3 waterNormal = GetNormalAtPosition(transform.position);
+        Vector3 waterSlope = GetNormalAtPosition(transform.position);
 
         Vector3 currentForward = transform.forward;
 
-        Vector3 targetUp = waterNormal;
+        Vector3 targetUp = waterSlope;
         Vector3 targetForward = Vector3.ProjectOnPlane(currentForward, targetUp).normalized;
 
         Quaternion targetRotation = Quaternion.LookRotation(targetForward, targetUp);
@@ -131,7 +134,6 @@ public class NewSurfBoardController : MonoBehaviour
             }
 
             Vector2 abstand = startPos - Touch.activeTouches[0].screenPosition;
-            Debug.Log("x: " + abstand.x + " y: " + abstand.y);
 
             if (abstand.y > 0)
             {
