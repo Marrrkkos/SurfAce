@@ -6,7 +6,7 @@ public class CameraFollow : MonoBehaviour
 
     [Header("Position Einstellungen")]
     public float fixedHeight = 8.0f;  // Die feste Höhe der Kamera (Y)
-    public float distance = 12.0f;     // Wie weit ist die Kamera HINTER dem Spieler?
+    public float distance = 5.0f;     // Wie weit ist die Kamera HINTER dem Spieler?
     public float followSpeed = 5.0f;   // Wie schnell zieht sie nach?
 
     [Header("Rotation Einstellungen")]

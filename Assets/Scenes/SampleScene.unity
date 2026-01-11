@@ -333,7 +333,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: '::'
   target: {fileID: 1071279283}
   fixedHeight: 10
-  distance: 12
+  distance: 5
   followSpeed: 5
   tiltAngle: 20
 --- !u!1 &339398755
@@ -367,13 +367,13 @@ MonoBehaviour:
   m_EditorClassIdentifier: '::'
   waves:
   - wavelength: 80
-    steepness: 0.5
+    steepness: 0.394
     direction: {x: 1, y: 0.1}
   - wavelength: 23
-    steepness: 0.15
+    steepness: 0.089
     direction: {x: 0.7, y: 0.7}
   - wavelength: 11
-    steepness: 0.2
+    steepness: 0.05
     direction: {x: 0.8, y: -0.4}
 --- !u!4 &339398757
 Transform:
@@ -759,12 +759,18 @@ MonoBehaviour:
   - {fileID: 1893911939}
   - {fileID: 44472322}
   rigidBody: {fileID: 1071279285}
-  floatStrength: 15
-  waterDrag: 3
-  waterAngularDrag: 1
-  wavePushStrength: 20
-  slideFactor: 0.5
-  inputMultiplier: 1
+  hoverHeight: 0.5
+  hoverForce: 50
+  hoverDamper: 5
+  alignSpeed: 5
+  sampleDist: 0.2
+  acceleration: 0.2
+  sideResistanceMultiplier: 0.2
+  frontResistanceMultiplier: 1
+  rotationMultiplier: 1
+  speedMultiplier: 1
+  startSpeed: 10
+  startSpeedDuration: 20
 --- !u!54 &1071279285
 Rigidbody:
   m_ObjectHideFlags: 0
@@ -773,7 +779,7 @@ Rigidbody:
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 1071279279}
   serializedVersion: 5
-  m_Mass: 10
+  m_Mass: 50
   m_LinearDamping: 0
   m_AngularDamping: 0.05
   m_CenterOfMass: {x: 0, y: -0.5, z: 0}

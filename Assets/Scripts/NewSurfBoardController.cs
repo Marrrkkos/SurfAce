@@ -4,82 +4,98 @@ using Touch = UnityEngine.InputSystem.EnhancedTouch.Touch;
 
 public class NewSurfBoardController : MonoBehaviour
 {
-    [Header("Setup")]
-    public Transform[] floaters;
+    public Transform[] floaters; // Brauchen wir nur noch für die Normale
     public Rigidbody rigidBody;
 
-    [Header("Auftrieb")]
-    public float floatStrength = 15f;
-    public float waterDrag = 3f;
-    public float waterAngularDrag = 1f;
+    [Header("Settings")]
+    public float hoverHeight = 0.5f;   // Wie hoch über dem Wasser schweben wir?
+    public float hoverForce = 50f;     // Wie stark drückt es hoch?
+    public float hoverDamper = 5f;     // Anti-Wippen
+    public float alignSpeed = 5f;      // Wie schnell passt sich Rotation der Welle an?
+    public float sampleDist = 0.2f;
+    public float acceleration = 0.2f;
 
-    [Header("Wellen-Dynamik (Das Neue)")]
-    // Wie stark schiebt die Welle das Board horizontal weg?
-    public float wavePushStrength = 20f;
-    // Wie stark rutscht das Board den Wellenberg runter?
-    public float slideFactor = 0.5f;
-    // Hilfswert für die Normalenberechnung (je kleiner, desto präziser)
-    private float sampleDist = 0.2f;
-    void Update()
+    public float sideResistanceMultiplier = 0.2f;
+    public float frontResistanceMultiplier = 1f;
+    public float rotationMultiplier = 1f;
+    public float speedMultiplier = 1f;
+    public float startSpeed = 10f;
+    public float startSpeedDuration = 5f;
+
+    private Vector3 currentRotationInput;
+    void Start()
     {
+        // WICHTIG: Wir verbieten der Physik, das Board zu drehen!
+        rigidBody.freezeRotation = true;
+    }
+    void Update() {
         HandleInput();
     }
     void FixedUpdate()
     {
-        applyPhysics();
+        // Vector3 currentSpeed;
+        // float startSpeed;
+
+        //Calculate Position (Only up down)
+        //Calculate Position (X and Z direction) über Velocity!!
+        //Global Variable for current Rotation -> set Rotation for current position
+        //Apply Input Rotation (Lenkung durch Velocity - forward
+
+        Vector3 waterSlope = GetNormalAtPosition(transform.position);
+        CalculateWaterVelocity(waterSlope);
+
+        CalculateStartVelocity();
+
+
+        CalculateHeight();
+
+        CalculateRotation();
     }
-    void applyPhysics() {
-        int floatersUnderwater = 0;
-        // Wir sammeln den durchschnittlichen Normalenvektor des Wassers
-        Vector3 combinedWaterNormal = Vector3.zero;
+    void CalculateWaterVelocity(Vector3 waterSlope) { 
+        Vector3 currentVelocity = rigidBody.linearVelocity;
+        Vector3 desiredVelocity = waterSlope * speedMultiplier;
 
-        foreach (Transform floater in floaters)
-        {
-            float waveHeight = RootWaveManager.instance.GetWaveHeight(floater.position);
-            float diff = waveHeight - floater.position.y;
+        // Board WiderStand
+        float angle = Vector3.Angle(desiredVelocity, transform.forward);
+        float foldedAngle = angle > 90f ? 180f - angle : angle;
+        float finalResistanceMultiplier = (((foldedAngle / 90) * frontResistanceMultiplier) * ((1 - (foldedAngle / 90)) * sideResistanceMultiplier)) / 2;
+        desiredVelocity = desiredVelocity * finalResistanceMultiplier;
 
-            if (diff > 0)
-            {
-                floatersUnderwater++;
+        Vector3 finalVelocity = new Vector3(desiredVelocity.x, currentVelocity.y, desiredVelocity.z);
+        rigidBody.linearVelocity = Vector3.Lerp(currentVelocity, finalVelocity, acceleration * Time.fixedDeltaTime);
+    }
 
-                // 1. AUFTRIEB (Wie vorher)
-                Vector3 buoyantForce = Vector3.up * diff * floatStrength;
-                rigidBody.AddForceAtPosition(buoyantForce, floater.position, ForceMode.Acceleration);
+    void CalculateStartVelocity() {
+        rigidBody.linearVelocity = Vector3.Lerp(startSpeed * transform.forward, Vector3.zero, startSpeedDuration * Time.fixedDeltaTime);
+    }
+    void CalculateHeight()
+    {
+        float waveHeight = RootWaveManager.instance.GetWaveHeight(transform.position);
+        float currentHeight = transform.position.y;
 
-                // 2. NORMALEN BERECHNEN (Der Trick)
-                // Wir holen uns die Neigung der Welle an genau diesem Punkt
-                Vector3 waterNormal = GetNormalAtPosition(floater.position);
-                combinedWaterNormal += waterNormal;
+        float targetHeight = waveHeight + hoverHeight;
 
-                // 3. HORIZONTALER SCHUB (Push)
-                // Wenn die Normale nach vorne zeigt, kommt die Welle von hinten -> Schub!
-                // Wir projizieren die Normale auf die flache Ebene (x,z)
-                Vector3 pushDirection = new Vector3(waterNormal.x, 0, waterNormal.z).normalized;
+        float diff = targetHeight - currentHeight;
 
-                // Wir wenden Kraft nur an, wenn die Welle steil genug ist
-                rigidBody.AddForceAtPosition(pushDirection * wavePushStrength * diff, floater.position, ForceMode.Acceleration);
-            }
-        }
+        float velocityY = rigidBody.linearVelocity.y;
+        float force = (diff * hoverForce) - (velocityY * hoverDamper);
 
-        // 4. DRAG & SLIDING (Rutschen)
-        if (floatersUnderwater > 0)
-        {
-            rigidBody.linearDamping = waterDrag;
-            rigidBody.angularDamping = waterAngularDrag;
+        rigidBody.AddForce(Vector3.up * force, ForceMode.Acceleration);
+    }
 
-            // Durchschnittliche Neigung des Wassers unter dem Board
-            Vector3 avgNormal = (combinedWaterNormal / floatersUnderwater).normalized;
+    void CalculateRotation()
+    {
+        Vector3 waterNormal = GetNormalAtPosition(transform.position);
 
-            // Optional: Extra "Rutschen" simulieren (Hangabtriebskraft verstärken)
-            // Wir addieren Kraft in die Richtung, in die das Wasser abfällt
-            Vector3 slideDir = Vector3.ProjectOnPlane(Vector3.down, avgNormal).normalized;
-            rigidBody.AddForce(slideDir * Physics.gravity.magnitude * slideFactor, ForceMode.Acceleration);
-        }
-        else
-        {
-            rigidBody.linearDamping = 0.05f;
-            rigidBody.angularDamping = 0.05f;
-        }
+        Vector3 currentForward = transform.forward;
+
+        Vector3 targetUp = waterNormal;
+        Vector3 targetForward = Vector3.ProjectOnPlane(currentForward, targetUp).normalized;
+
+        Quaternion targetRotation = Quaternion.LookRotation(targetForward, targetUp);
+
+        transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.fixedDeltaTime * alignSpeed);
+        transform.Rotate(currentRotationInput);
     }
     Vector3 GetNormalAtPosition(Vector3 pos)
     {
@@ -103,11 +119,10 @@ public class NewSurfBoardController : MonoBehaviour
 
 
     private Vector2 startPos = Vector2.zero;
-    public float inputMultiplier = 1f;
+
     void HandleInput()
     {
 
-       
         if (Touch.activeTouches.Count >= 1)
         {
             if (Touch.activeTouches[0].phase == UnityEngine.InputSystem.TouchPhase.Began)
@@ -117,24 +132,18 @@ public class NewSurfBoardController : MonoBehaviour
 
             Vector2 abstand = startPos - Touch.activeTouches[0].screenPosition;
             Debug.Log("x: " + abstand.x + " y: " + abstand.y);
-            
-            if (abstand.y > 0) 
+
+            if (abstand.y > 0)
             {
-                rigidBody.AddForceAtPosition(abstand.y * Vector3.down * inputMultiplier * 0.01f, floaters[0].position, ForceMode.Acceleration);
-            } 
-            else 
-            {
-                rigidBody.AddForceAtPosition(-abstand.y * Vector3.down * inputMultiplier * 0.01f, floaters[1].position, ForceMode.Acceleration);
-            }
-            if (abstand.x > 0)
-            {
-                rigidBody.AddForceAtPosition(abstand.x * Vector3.down * inputMultiplier * 0.01f, floaters[2].position, ForceMode.Acceleration);
             }
             else
             {
-                rigidBody.AddForceAtPosition(-abstand.x * Vector3.down * inputMultiplier * 0.01f, floaters[3].position, ForceMode.Acceleration);
             }
+            currentRotationInput = Vector3.down * 0.01f * abstand.x;
 
+        }
+        else {
+            currentRotationInput = Vector3.zero;
         }
     }
     void OnEnable()
