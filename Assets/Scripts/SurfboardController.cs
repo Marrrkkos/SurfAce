@@ -4,91 +4,78 @@ using Touch = UnityEngine.InputSystem.EnhancedTouch.Touch;
 
 public class SurfBoardController : MonoBehaviour
 {
-    public Transform oceanTransform;
-    [Header("Brett-Einstellungen")]
-    public float boardLength = 3.0f;
-    public float boardWidth = 1.0f;
+    public Transform oceanTF;
+    [Header("general")]
+    public float sampleDist = 0.2f;
+    public float startSpeed = 10f;
 
-    public float speed;
+    [Header("worldSettings")]
+    private float gravitiy = 10f;
+    public float waterForce = 2f;
+    public float waterBreakPoint = 10f;
+    public float velocityMultilpier = 0.2f;
 
-    private float currentYawX;
-    private float currentYawY;
-
-    void Update() {
-        //MoveForward();
-        //ApplyRotationOnWater();
+    private Vector3 currentVelocity;
+    void Start() {
+        currentVelocity = startSpeed * transform.forward;
     }
-    void MoveForward() {
-        Vector3 forwardFlat = new Vector3(transform.forward.x, 0, transform.forward.z).normalized;
-
-        transform.position += forwardFlat * speed * Time.deltaTime;
-    }
-
-    void ApplyRotationOnWater()
+    void Update()
     {
-        Vector3 basePos = new Vector3(50f, 0f, 50f);
-        Vector3 displacement = RootWaveManager.instance.GetWaveDisplacement(basePos);
-        transform.position = basePos + displacement;
+        // Vector3 currentSpeed;
+        // float startSpeed;
 
-        transform.position = new Vector3(50f, RootWaveManager.instance.GetWaveHeight(basePos),50f);
-
-        /*Vector3 oceanPos = oceanTransform.position;
-        Vector3 oceanSize = new Vector3(GameManager.instance.oceanSize, 0, GameManager.instance.oceanSize);
-
-        Quaternion yawRot = Quaternion.Euler(currentYawY, currentYawX, 0);
-        float halfLen = boardLength / 2.0f;
-        float halfWid = boardWidth / 2.0f;
-
-        Vector3 pNose = transform.position + yawRot * new Vector3(0, 0, halfLen);
-        Vector3 pTailL = transform.position + yawRot * new Vector3(-halfWid, 0, -halfLen);
-        Vector3 pTailR = transform.position + yawRot * new Vector3(halfWid, 0, -halfLen);
+        // Calculate Estimated Speed Position, (Positiona fter no resisistance at all)
+        // if under Water and speed > waterBreakPoint-> Go under Water, else set Transform at waterheight
+        // If not under Water ->set Transform to Estimated Speed position
+        // Apply Gravitiy
+        // Apply Rotation
 
 
-        pNose.y = RootWaveManager.instance.GetWaveHeight(pNose);
-        pTailL.y = RootWaveManager.instance.GetWaveHeight(pTailL);
-        pTailR.y = RootWaveManager.instance.GetWaveHeight(pTailR);
+        Vector3 waterSlope = GetWaterSlope(transform.position);
+        calculateVelocity(waterSlope);
+        if (RootWaveManager.instance.GetWaveHeight(transform.position) < transform.position.y)
+        {
+            doAboveWater();
+        }
+        else {
+            doUnderWater();
+        }
+        applyRotation(waterSlope);
 
-        Debug.DrawLine(pNose, pTailL, Color.red);
-        Debug.DrawLine(pTailL, pTailR, Color.red);
-        Debug.DrawLine(pTailR, pNose, Color.red);
 
-        Debug.DrawRay(transform.position, transform.forward * 200, Color.green);
 
-        Vector3 centerTail = (pTailL + pTailR) / 2f;
 
-        Vector3 newForward = (pNose - centerTail).normalized;
-
-        Vector3 newRight = (pTailR - pTailL).normalized;
-
-        Vector3 newUp = Vector3.Cross(newForward, newRight);
-
-        Quaternion targetRotation = Quaternion.LookRotation(newForward, newUp);
-
-        float smoothSpeed = 10f;
-        //transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.deltaTime * smoothSpeed);
-        transform.rotation = targetRotation;
-        float avgHeight = (pNose.y + pTailL.y + pTailR.y) / 3f;
-
-        transform.position = new Vector3(transform.position.x, avgHeight, transform.position.z);*/
     }
+    void calculateVelocity(Vector3 waterSlope) {
+        Vector3 downhill = Vector3.ProjectOnPlane(Vector3.down, waterSlope).normalized;
+        Vector3 gravityVec = new Vector3(0, gravitiy, 0);
 
-    private Vector2 startPos = Vector2.zero;
-    public float rotationSpeed = 1f;
-    void HandleInput() {
-        if (Touch.activeTouches.Count > 0) {
-            Debug.Log("tesdt2");
-            if (Touch.activeTouches[0].phase == UnityEngine.InputSystem.TouchPhase.Began)
-            {
-                startPos = Touch.activeTouches[0].screenPosition;
-            }
-
-            Vector2 abstand = startPos - Touch.activeTouches[0].screenPosition;
-            float rotationAmountX = abstand.x * rotationSpeed * Time.deltaTime;
-            float rotationAmountY = abstand.y * rotationSpeed * Time.deltaTime;
-            currentYawX -= rotationAmountX;
-            currentYawY -= rotationAmountY;
-            Debug.Log(abstand.x + " y: " + abstand.y);
+        transform.position += currentVelocity.normalized * velocityMultilpier * 0.01f;
+        currentVelocity += ((downhill - gravityVec) * velocityMultilpier * 0.01f);
+        Debug.Log("x: " + currentVelocity.x + " y: " + currentVelocity.y + " z: " + currentVelocity.z);
+    }
+    private void doUnderWater() {
+        if (-currentVelocity.y > waterBreakPoint) {
+            Debug.Log("GAME END -> You got under Water!!");
+        }
+        else {
+            float y = RootWaveManager.instance.GetWaveHeight(transform.position);
+            transform.position = new Vector3(transform.position.x, y, transform.position.z);
         }
     }
-    
+    private void doAboveWater() { 
+
+    }
+    private void applyRotation(Vector3 waterSlope) { 
+    }
+
+    private Vector3 GetWaterSlope(Vector3 pos)
+    {
+        float h0 = RootWaveManager.instance.GetWaveHeight(pos);
+        float hX = RootWaveManager.instance.GetWaveHeight(pos + new Vector3(sampleDist, 0, 0));
+        float hZ = RootWaveManager.instance.GetWaveHeight(pos + new Vector3(0, 0, sampleDist));
+        Vector3 v1 = new Vector3(sampleDist, hX - h0, 0);
+        Vector3 v2 = new Vector3(0, hZ - h0, sampleDist);
+        return Vector3.Cross(v2, v1).normalized;
+    }
 }

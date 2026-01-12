@@ -23,6 +23,8 @@ public class NewSurfBoardController : MonoBehaviour
     public float startSpeedDuration = 5f;
     public float waterForce = 10f;
     public float gravityForce = 1f;
+    public float waterBreakPoint = 10f;
+
     private Vector3 currentRotationInput;
     void Start()
     {
@@ -39,17 +41,18 @@ public class NewSurfBoardController : MonoBehaviour
         // Vector3 currentSpeed;
         // float startSpeed;
 
-        //Calculate Position (Only up down)
-        //Calculate Position (X and Z direction) über Velocity!!
-        //Global Variable for current Rotation -> set Rotation for current position
-        //Apply Input Rotation (Lenkung durch Velocity - forward
+        // Calculate Estimated Speed Position, (Positiona fter no resisistance at all)
+        // if under Water and speed > waterBreakPoint-> Go under Water, else set Transform at waterheight
+        // If not under Water ->set Transform to Estimated Speed position
+        // Apply Gravitiy
+        // Apply Rotation
 
+        CalculateHeight();
         Vector3 waterSlope = GetNormalAtPosition(transform.position);
         CalculateWaterVelocity(waterSlope);
 
 
 
-        CalculateHeight();
 
         CalculateRotation();
     }
@@ -76,13 +79,22 @@ public class NewSurfBoardController : MonoBehaviour
         float waveHeight = RootWaveManager.instance.GetWaveHeight(transform.position);
         float currentHeight = transform.position.y;
 
-        float targetHeight = waveHeight;
-
-        float diff = targetHeight - currentHeight;
+        float diff = waveHeight - currentHeight;
         float velocityY = rigidBody.linearVelocity.y;
-        float force = (diff * hoverForce) - (velocityY * hoverDamper);
 
-        rigidBody.AddForce(Vector3.up * force, ForceMode.Acceleration);
+
+        float force = (diff * hoverForce) - (velocityY * hoverDamper);
+        if (diff > 0 && velocityY > waterBreakPoint)
+        {
+            rigidBody.AddForce(Vector3.up * force, ForceMode.Acceleration);
+            //Apply WaterForce
+        }
+        else { 
+            
+        }
+
+
+        
 
     }
 
