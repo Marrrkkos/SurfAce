@@ -29,12 +29,12 @@ public class NewSurfBoardController : MonoBehaviour
     void Start()
     {
         // WICHTIG: Wir verbieten der Physik, das Board zu drehen!
-        rigidBody.freezeRotation = true;
+        //rigidBody.freezeRotation = true;
 
-        CalculateStartVelocity();
+        //CalculateStartVelocity();
     }
     void Update() {
-        HandleInput();
+        //HandleInput();
     }
     void FixedUpdate()
     {
@@ -47,14 +47,14 @@ public class NewSurfBoardController : MonoBehaviour
         // Apply Gravitiy
         // Apply Rotation
 
-        CalculateHeight();
-        Vector3 waterSlope = GetNormalAtPosition(transform.position);
-        CalculateWaterVelocity(waterSlope);
+        //CalculateHeight();
+        //Vector3 waterSlope = GetNormalAtPosition(transform.position);
+        //CalculateWaterVelocity(waterSlope);
 
 
 
 
-        CalculateRotation();
+        //CalculateRotation();
     }
     void CalculateWaterVelocity(Vector3 waterSlope) { 
         Vector3 currentVelocity = rigidBody.linearVelocity;
