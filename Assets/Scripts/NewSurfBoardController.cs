@@ -4,169 +4,112 @@ using Touch = UnityEngine.InputSystem.EnhancedTouch.Touch;
 
 public class NewSurfBoardController : MonoBehaviour
 {
-    public Transform[] floaters; // Brauchen wir nur noch für die Normale
-    public Rigidbody rigidBody;
+    [Header("Dependencies")]
+    public Transform oceanTF;
 
-    [Header("Settings")]
-    public float hoverHeight = 0.5f;   // Wie hoch über dem Wasser schweben wir?
-    public float hoverForce = 50f;     // Wie stark drückt es hoch?
-    public float hoverDamper = 5f;     // Anti-Wippen
-    public float alignSpeed = 5f;      // Wie schnell passt sich Rotation der Welle an?
-    public float sampleDist = 0.2f;
-    public float acceleration = 0.2f;
+    [Header("General")]
+    public float rotationStrength = 1f;
+    public float lerpSpeed = 1f;
 
-    public float sideResistanceMultiplier = 0.2f;
-    public float frontResistanceMultiplier = 1f;
-    public float rotationMultiplier = 1f;
-    public float speedMultiplier = 1f;
+    [Header("Physics")]
+    public float velocityStrength = 1f;
     public float startSpeed = 10f;
-    public float startSpeedDuration = 5f;
-    public float waterForce = 10f;
-    public float gravityForce = 1f;
-    public float waterBreakPoint = 10f;
 
-    private Vector3 currentRotationInput;
+
+    public Vector3 currentVelocity;
+    public float currentSpeed;
+    private bool gameOver = false;
+
+    private float currentTurnInput;
+
+    void OnEnable() => EnhancedTouchSupport.Enable();
+    void OnDisable() => EnhancedTouchSupport.Disable();
+
     void Start()
     {
-        // WICHTIG: Wir verbieten der Physik, das Board zu drehen!
-        //rigidBody.freezeRotation = true;
+        currentSpeed = startSpeed;
+    }
 
-        //CalculateStartVelocity();
+    void Update()
+    {
+        if (gameOver) return;
+        HandleInput();
     }
-    void Update() {
-        //HandleInput();
-    }
+
     void FixedUpdate()
     {
-        // Vector3 currentSpeed;
-        // float startSpeed;
+        if (gameOver) return;
 
-        // Calculate Estimated Speed Position, (Positiona fter no resisistance at all)
-        // if under Water and speed > waterBreakPoint-> Go under Water, else set Transform at waterheight
-        // If not under Water ->set Transform to Estimated Speed position
-        // Apply Gravitiy
-        // Apply Rotation
-
-        //CalculateHeight();
-        //Vector3 waterSlope = GetNormalAtPosition(transform.position);
-        //CalculateWaterVelocity(waterSlope);
-
-
-
-
-        //CalculateRotation();
-    }
-    void CalculateWaterVelocity(Vector3 waterSlope) { 
-        Vector3 currentVelocity = rigidBody.linearVelocity;
-        Vector3 desiredVelocity = waterSlope * speedMultiplier;
-
-        // Board WiderStand
-        float angle = Vector3.Angle(desiredVelocity, transform.forward);
-        float foldedAngle = angle > 90f ? 180f - angle : angle;
-        float finalResistanceMultiplier = (((foldedAngle / 90) * frontResistanceMultiplier) * ((1 - (foldedAngle / 90)) * sideResistanceMultiplier)) / 2;
-        desiredVelocity = desiredVelocity * finalResistanceMultiplier;
-
-        Vector3 finalVelocity = new Vector3(desiredVelocity.x, currentVelocity.y, desiredVelocity.z);
-        rigidBody.linearVelocity = Vector3.Lerp(currentVelocity, finalVelocity, acceleration * Time.fixedDeltaTime);
-    }
-
-    void CalculateStartVelocity() {
-        rigidBody.AddForce(transform.forward * startSpeed, ForceMode.Acceleration);
-    }
-    void CalculateHeight()
-    {
-        
+        Vector3 waterSlopeNormal = GetWaterSlopeNormal(transform.position, 0.5f);
         float waveHeight = RootWaveManager.instance.GetWaveHeight(transform.position);
         float currentHeight = transform.position.y;
-
-        float diff = waveHeight - currentHeight;
-        float velocityY = rigidBody.linearVelocity.y;
+        float depth = waveHeight - currentHeight;
 
 
-        float force = (diff * hoverForce) - (velocityY * hoverDamper);
-        if (diff > 0 && velocityY > waterBreakPoint)
-        {
-            rigidBody.AddForce(Vector3.up * force, ForceMode.Acceleration);
-            //Apply WaterForce
-        }
-        else { 
-            
-        }
 
-
-        
-
+        HandlePosition(waveHeight, depth, waterSlopeNormal);
+        HandleRotation(waterSlopeNormal, depth > 0);
     }
-
-    void CalculateRotation()
+    private void HandlePosition(float waveHeight, float depth, Vector3 surfaceNormal)
     {
-        Vector3 waterSlope = GetNormalAtPosition(transform.position);
+        Vector3 slope = Vector3.ProjectOnPlane(Vector3.down, surfaceNormal).normalized;
+        currentVelocity += slope * velocityStrength * 0.1f;
+        currentSpeed = (currentSpeed + currentSpeed * Vector3.Dot(slope, transform.forward) * 0.01f);
 
-        Vector3 currentForward = transform.forward;
 
-        Vector3 targetUp = waterSlope;
-        Vector3 targetForward = Vector3.ProjectOnPlane(currentForward, targetUp).normalized;
-
-        Quaternion targetRotation = Quaternion.LookRotation(targetForward, targetUp);
-
-        transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, Time.fixedDeltaTime * alignSpeed);
-        transform.Rotate(currentRotationInput);
+        Vector3 nextPosition = transform.position + ((transform.forward * currentSpeed) + currentVelocity) * 0.02f; // 0.02 FixedUpdate
+        Vector3 finalPosition = new Vector3(nextPosition.x, waveHeight + 0.1f, nextPosition.z);
+        transform.position = Vector3.Lerp(transform.position, finalPosition, Time.deltaTime * lerpSpeed);
     }
-    Vector3 GetNormalAtPosition(Vector3 pos)
+    
+    private void HandleRotation(Vector3 surfaceNormal, bool isSurfing)
+    {
+            Vector3 targetUp = surfaceNormal;
+            Vector3 targetForward = Vector3.ProjectOnPlane(transform.forward, surfaceNormal).normalized;
+
+            Quaternion targetRotation = Quaternion.LookRotation(targetForward, targetUp);
+
+            transform.rotation = Quaternion.Slerp(transform.rotation, targetRotation, 5f * Time.fixedDeltaTime);
+
+            transform.Rotate(Vector3.up, currentTurnInput * rotationStrength, Space.Self);
+
+    }
+
+    private Vector3 GetWaterSlopeNormal(Vector3 pos, float sampleDist)
     {
         float h0 = RootWaveManager.instance.GetWaveHeight(pos);
         float hX = RootWaveManager.instance.GetWaveHeight(pos + new Vector3(sampleDist, 0, 0));
         float hZ = RootWaveManager.instance.GetWaveHeight(pos + new Vector3(0, 0, sampleDist));
+
         Vector3 v1 = new Vector3(sampleDist, hX - h0, 0);
         Vector3 v2 = new Vector3(0, hZ - h0, sampleDist);
+
         return Vector3.Cross(v2, v1).normalized;
     }
 
-
-
-
-
-
-
-
-
-
-
-
-    private Vector2 startPos = Vector2.zero;
+    private Vector2 touchStartPos;
 
     void HandleInput()
     {
-
-        if (Touch.activeTouches.Count >= 1)
+        if (Touch.activeTouches.Count > 0)
         {
-            if (Touch.activeTouches[0].phase == UnityEngine.InputSystem.TouchPhase.Began)
+            var touch = Touch.activeTouches[0];
+
+            if (touch.phase == UnityEngine.InputSystem.TouchPhase.Began)
             {
-                startPos = Touch.activeTouches[0].screenPosition;
+                touchStartPos = touch.screenPosition;
             }
 
-            Vector2 abstand = startPos - Touch.activeTouches[0].screenPosition;
+            Vector2 offset = touch.screenPosition - touchStartPos;
 
-            if (abstand.y > 0)
-            {
-            }
-            else
-            {
-            }
-            currentRotationInput = Vector3.down * 0.01f * abstand.x;
+            float normalizedTurn = Mathf.Clamp(offset.x / Screen.width, -1f, 1f);
 
+            currentTurnInput = normalizedTurn;
         }
-        else {
-            currentRotationInput = Vector3.zero;
+        else
+        {
+            currentTurnInput = Mathf.Lerp(currentTurnInput, 0, Time.deltaTime * 5f);
         }
     }
-    void OnEnable()
-    {
-        EnhancedTouchSupport.Enable();
-    }
-
-    void OnDisable()
-    {
-        EnhancedTouchSupport.Disable();
-    }
+    
 }
